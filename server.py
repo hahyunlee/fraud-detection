@@ -1,0 +1,110 @@
+import pickle
+from flask import Flask, render_template, request, jsonify, Response
+import pandas as pd
+from pymongo import MongoClient, UpdateOne
+import json
+from flask_cors import CORS
+import numpy as np
+from sklearn.ensemble import RandomForestClassifier
+from main import *
+
+app = Flask(__name__)
+CORS(app)
+
+###########################
+
+
+@app.route('/dash_table', methods=['GET'])
+def dash_table():
+
+    df = pd.read_json('data/data.json')
+    country = df.country
+    null = df.country.isnull()
+    country[null] = 0
+
+    name = df.name
+    null = df.name.isnull()
+    name[null] = 0
+
+    currency = df.currency
+    null = df.currency.isnull()
+    currency[null] = 0
+
+    data = list(zip(country, name, currency))
+    return jsonify(data)
+
+
+###########################
+
+
+# Need to load in the model here
+
+# make a prediction Route
+@app.route('/inference', methods=['GET', 'POST'])
+def inference():
+    '''
+        This should return the prediction from a
+        single data point
+    '''
+
+    raw_data = request.get_json()
+
+    # Your Code goes here
+    client = MongoClient('mongodb://localhost:27017/')
+    db = client['testing_fraud']
+
+    result = []
+    for count in [471,472,473, 474]:
+        temp_dict = {}
+        for key in ['object_id', 'event_created', 'country', 'prediction', 'probability']:
+            temp_dict[key] = list(db.collection.find())[count][key]
+        result.append(temp_dict)
+
+#    prediction = 'Fraud'
+#    print('Prediction = ', prediction)
+#    return jsonify({'prediction': 'fraud'})
+    res = jsonify(result)
+    #res.headers['Access-Control-Allow-Origin'] = '*'
+    #res.headers['Access-Control-Allow-Methods'] = 
+  #  res.headers('Access-Control-Allow-Origin: *');
+ #   res.headers('Access-Control-Allow-Methods: GET, POST, PATCH, PUT, DELETE, OPTIONS');
+#    res.headers('Access-Control-Allow-Headers: Origin, Content-Type, X-Auth-Token');
+    return res	
+
+
+###########################
+
+
+# Route for getting new data
+@app.route('/new_data', methods=['GET'])
+def get_data():
+    import requests
+    api_key = 'vYm9mTUuspeyAWH1v-acfoTlck-tCxwTw9YfCynC'
+    url = 'https://hxobin8em5.execute-api.us-west-2.amazonaws.com/api/'
+    sequence_number = 0
+    response = requests.post(url, json={'api_key': api_key,
+                                        'sequence_number': sequence_number})
+    raw_data = response.json()
+    return jsonify(raw_data)
+
+
+# @app.route('/new_data', methods=['GET'])
+# def store_data():
+#     sequence_number = 0
+#     while True:
+#         response = requests.post(
+#             url, json={'api_key': api_key, 'sequence_number': sequence_number})
+#         raw_data = response.json()
+#         if raw_data['_next_sequence_number'] != sequence_number:
+#             sequence_number = raw_data['_next_sequence_number']
+#             #df = pd.DataFrame.from_dict(raw_data['data'][0],orient = 'index').T
+#             rdb.collection.insert_one(raw_data['data'][0])
+#         # print(sequence_number)
+#         time.sleep(120)
+
+##########################
+
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=3333, debug=True)
+    print("test")
